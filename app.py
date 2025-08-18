@@ -10,7 +10,7 @@ from typing import List
 
 app = FastAPI()
 DB_FILE = "earnsry.db"
-SERVE_URL = "https://092e1eb2f8868a14486dc821c5821789.serveo.net"
+SERVE_URL = "https://backend-f6zj.onrender.com"
 NETLIFY_URL = "https://captchae.site"
 
 # Pydantic models
