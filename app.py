@@ -32,7 +32,7 @@ class Link(BaseModel):
     original_url: str
     views: int
     created_at: int
-    
+
 class UserStats(BaseModel):
     total_views: int
     total_earnings: float
@@ -161,15 +161,15 @@ async def serve_ad_page_1(slug: str, request: Request):
     cursor = conn.cursor()
     cursor.execute("SELECT original_url FROM urls WHERE slug = ?", (slug,))
     result = cursor.fetchone()
-    
+
     if not result:
         conn.close()
         raise HTTPException(status_code=404, detail="Slug not found.")
-    
+
     conn.close()
-    
+
     base_url = str(request.base_url).rstrip('/')
-    
+
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -198,7 +198,7 @@ async def serve_ad_page_1(slug: str, request: Request):
     <div class="bg-white p-8 rounded-lg shadow-xl text-center max-w-sm">
         <h1 class="text-2xl font-bold mb-4">Your link is almost ready!</h1>
         <p class="text-gray-600 mb-6">Please wait for <span id="countdown" class="font-bold text-red-500">5</span> seconds.</p>
-        
+
         <div class="bg-gray-200 p-4 rounded-md mb-6">
             <p class="text-gray-500">This is a placeholder for your ads.</p>
         </div>
@@ -262,7 +262,7 @@ async def serve_ad_page_2_content(slug: str):
     <div class="bg-white p-8 rounded-lg shadow-xl text-center max-w-sm">
         <h1 class="text-2xl font-bold mb-4">You are almost there!</h1>
         <p class="text-gray-600 mb-6">Please wait another <span id="countdown_2" class="font-bold text-red-500">5</span> seconds.</p>
-        
+
         <div class="bg-gray-200 p-4 rounded-md mb-6">
             <p class="text-gray-500">This is a placeholder for your second ad.</p>
         </div>
@@ -277,7 +277,7 @@ async def serve_ad_page_2_content(slug: str):
         let countdown_2 = 5;
         const countdownEl_2 = document.getElementById('countdown_2');
         const getFinalLinkBtn = document.getElementById('get-final-link-btn');
-        
+
         const timer_2 = setInterval(() => {{
             countdown_2--;
             countdownEl_2.textContent = countdown_2;
@@ -292,7 +292,7 @@ async def serve_ad_page_2_content(slug: str):
 
         getFinalLinkBtn.addEventListener('click', () => {{
             // Tell parent window to redirect to final URL
-            window.parent.postMessage({{ 
+            window.parent.postMessage({{
                 action: 'redirect',
                 slug: "{slug}"
             }}, '*');
@@ -309,7 +309,7 @@ async def get_final_link(slug: str):
     cursor = conn.cursor()
     cursor.execute("SELECT original_url FROM urls WHERE slug = ?", (slug,))
     result = cursor.fetchone()
-    
+
     if result:
         original_url = result['original_url']
         cursor.execute("UPDATE urls SET views = views + 1 WHERE slug = ?", (slug,))
@@ -326,23 +326,23 @@ async def get_user_stats(user_uid: str):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("SELECT SUM(views) AS total_views FROM urls WHERE user_uid = ?", (user_uid,))
         total_views = cursor.fetchone()['total_views'] or 0
-        
+
         cpm = 4.00
         total_earnings = (total_views / 1000) * cpm
-        
+
         cursor.execute("SELECT slug, original_url, views, created_at FROM urls WHERE user_uid = ? ORDER BY created_at DESC", (user_uid,))
         links = [dict(row) for row in cursor.fetchall()]
-        
+
         conn.close()
-        
+
         return UserStats(
             total_views=total_views,
             total_earnings=round(total_earnings, 2),
             cpm_rate=cpm,
-            referrals=0, 
+            referrals=0,
             links=links
         )
     except Exception as e:
