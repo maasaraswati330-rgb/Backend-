@@ -1,7 +1,4 @@
-fastapi
-uvicorn
-sqlalchemy
-databases
-pydantic
-python-multipart
-jinja2
+fastapi==0.110.1
+uvicorn==0.30.1
+pydantic==2.7.1
+sqlite3  # Note: not required to install separately; included in Python stdlib
