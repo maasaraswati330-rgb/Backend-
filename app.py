@@ -48,16 +48,17 @@ def extract_streams(url):
     'quiet': True,
     'no_warnings': True,
     'extract_flat': False,
-    'format': 'bv*+ba/best',
+    'format': 'bv*+ba/bestvideo+bestaudio/best',
     'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     'force_ipv4': True,
-    'cookiefile': cookiefile,
-    'cookiesfrombrowser': None,   # force disable auto-refresh
-    }
+}
 
-    if cookiefile:
-        ydl_opts['cookiefile'] = cookiefile
-
+cookiefile = os.environ.get('YT_COOKIES_FILE')
+if cookiefile and os.path.exists(cookiefile):
+    import shutil, tempfile, os
+    tmp_cookie = os.path.join(tempfile.gettempdir(), "cookies.txt")
+    shutil.copy(cookiefile, tmp_cookie)
+    ydl_opts['cookiefile'] = tmp_cookie
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         title = info.get('title', 'Unknown Title')
