@@ -45,12 +45,14 @@ def extract_streams(url):
     cookiefile = os.environ.get('YT_COOKIES_FILE')  # optional cookie file
 
     ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': False,
-        'format': 'bestvideo+bestaudio/best',
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'force_ipv4': True,
+    'quiet': True,
+    'no_warnings': True,
+    'extract_flat': False,
+    'format': 'bv*+ba/best',
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    'force_ipv4': True,
+    'cookiefile': cookiefile,
+    'cookiesfrombrowser': None,   # force disable auto-refresh
     }
 
     if cookiefile:
