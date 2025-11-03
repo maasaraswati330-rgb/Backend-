@@ -1,21 +1,48 @@
-# main.py (Final, Corrected, and Secure Version)
+# main.py (Instaloader Version)
 import os
+import re
 import uuid
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import yt_dlp
+import instaloader
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
 
-# --- Environment Variables se Instagram Credentials Lena ---
-# Yeh details Render ke "Environment" section me set hongi
+# --- Environment Variables se Credentials Lena ---
 INSTA_USER = os.environ.get('INSTA_USER')
 INSTA_PASS = os.environ.get('INSTA_PASS')
 
 DOWNLOAD_FOLDER = "downloads"
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
+
+# --- Instaloader ka Instance Banana ---
+L = instaloader.Instaloader(
+    download_videos=True,
+    download_pictures=False,
+    download_video_thumbnails=False,
+    download_geotags=False,
+    download_comments=False,
+    save_metadata=False,
+    compress_json=False,
+    dirname_pattern=DOWNLOAD_FOLDER
+)
+
+# --- Login Karna (Sirf ek baar, server start hone par) ---
+try:
+    print("Instagram me login karne ki koshish...")
+    L.login(INSTA_USER, INSTA_PASS)
+    print("Login successful!")
+except Exception as e:
+    print(f"Login failed: {e}")
+
+
+def get_shortcode_from_url(url):
+    # URL se shortcode (e.g., 'DPWZawaDrul') nikalne ke liye
+    match = re.search(r"/(?:p|reel)/([w-]+)", url)
+    return match.group(1) if match else None
 
 @app.route('/download', methods=['POST'])
 def download_media():
@@ -26,64 +53,60 @@ def download_media():
     if not url:
         return jsonify({"error": "URL is required."}), 400
 
+    shortcode = get_shortcode_from_url(url)
+    if not shortcode:
+        return jsonify({"error": "Invalid Instagram URL."}), 400
+
     try:
-        unique_id = str(uuid.uuid4())
+        print(f"Post fetch kar raha hoon: {shortcode}")
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+
+        # Video download karna
+        L.download_post(post, target=f"temp_{shortcode}")
         
-        # --- Yahan Sahi Code Hai ---
-        # Common options jo dono format ke liye use honge
-        common_opts = {
-            'quiet': True,
-            'username': INSTA_USER,
-            'password': INSTA_PASS,
-        }
+        # Downloaded file ka path dhoondhna
+        video_path = None
+        temp_dir = f"temp_{shortcode}"
+        for f in os.listdir(temp_dir):
+            if f.endswith('.mp4'):
+                video_path = os.path.join(temp_dir, f)
+                break
         
+        if not video_path:
+            return jsonify({"error": "Video file not found after download."}), 500
+        
+        # Final file jo user ko bhejenge
+        final_path = video_path
+
         if media_format == 'audio':
-            # Audio ke liye specific options
-            ydl_opts = {
-                **common_opts, # Common options yahan aa gaye
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-                'outtmpl': os.path.join(DOWNLOAD_FOLDER, f"{unique_id}.%(ext)s"),
-            }
-            final_extension = 'mp3'
-        else: # 'video' ke liye
-            # Video ke liye specific options
-            ydl_opts = {
-                **common_opts, # Common options yahan aa gaye
-                'format': 'best',
-                'outtmpl': os.path.join(DOWNLOAD_FOLDER, f"{unique_id}.%(ext)s"),
-            }
-            final_extension = 'mp4'
+            print("Audio extract kar raha hoon...")
+            audio_filename = f"{str(uuid.uuid4())}.mp3"
+            final_path = os.path.join(DOWNLOAD_FOLDER, audio_filename)
+            
+            # FFmpeg command to convert video to mp3
+            command = [
+                'ffmpeg', '-i', video_path,
+                '-q:a', '0', '-map', 'a', final_path
+            ]
+            subprocess.run(command, check=True, capture_output=True)
+            print("Audio extraction complete.")
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Login karne ki koshish karega
-            ydl.extract_info(url, download=True) 
-            info = ydl.extract_info(url, download=False) # Info dobara nikalte hain filename ke liye
-            
-            # Filename set karte hain
-            original_path = ydl.prepare_filename(info)
-            
+        # File bhejna aur fir temporary files delete karna
+        response = send_file(final_path, as_attachment=True)
+        
+        # Cleanup
+        try:
+            import shutil
+            shutil.rmtree(temp_dir)
             if media_format == 'audio':
-                base_path, _ = os.path.splitext(original_path)
-                final_path = f"{base_path}.{final_extension}"
-            else:
-                final_path = original_path
-
-        if os.path.exists(final_path):
-            return send_file(final_path, as_attachment=True, download_name=os.path.basename(final_path))
-        else:
-            return jsonify({"error": "Processing failed. Could not locate the final file."}), 500
+                os.remove(final_path) # Audio file ko bhi delete karein
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+            
+        return response
 
     except Exception as e:
-        error_message = str(e)
-        if 'login required' in error_message.lower():
-            return jsonify({"error": "Authentication failed on server. Please check credentials."}), 401
-        return jsonify({"error": error_message}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Gunicorn isko run karega
     app.run()
